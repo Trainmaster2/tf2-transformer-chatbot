@@ -116,14 +116,12 @@ train_ds = train_ds.map(tf_encode).filter(filter_max_length)
 train_ds = train_ds.cache()
 train_ds = train_ds.shuffle(BUFFER_SIZE)
 # pad both questions and answers to (BATCH_SIZE, MAX_LENGTH)
-train_ds = train_ds.padded_batch(
-    BATCH_SIZE, padded_shapes=([MAX_LENGTH], [MAX_LENGTH]))
+train_ds = train_ds.padded_batch(BATCH_SIZE, padded_shapes=([-1], [-1]))
 train_ds = train_ds.prefetch(tf.data.experimental.AUTOTUNE)
 
 eval_ds = tf.data.Dataset.from_tensor_slices((eval_questions, eval_answers))
 eval_ds = eval_ds.map(tf_encode).filter(filter_max_length)
-eval_ds = eval_ds.padded_batch(
-    BATCH_SIZE, padded_shapes=([MAX_LENGTH], [MAX_LENGTH]))
+eval_ds = eval_ds.padded_batch(BATCH_SIZE, padded_shapes=([-1], [-1]))
 
 print('Train dataset: {}'.format(train_ds))
 print('Evaluation dataset: {}'.format(eval_ds))
@@ -205,8 +203,8 @@ def scaled_dot_product_attention(query, key, value, mask):
 
 class MultiHeadAttention(tf.keras.layers.Layer):
 
-  def __init__(self, d_model, num_heads):
-    super(MultiHeadAttention, self).__init__()
+  def __init__(self, d_model, num_heads, name='multi_head_attention'):
+    super(MultiHeadAttention, self).__init__(name)
     self.num_heads = num_heads
     self.d_model = d_model
 
@@ -293,6 +291,36 @@ class EncoderLayer(tf.keras.layers.Layer):
     return out2
 
 
+NUM_LAYERS = 4
+D_MODEL = 128
+UNITS = 512
+NUM_HEADS = 8
+DROPOUT = 0.1
+
+
+# Define encoder layer
+def get_encoder_layer(max_length, units, d_model, num_heads, dropout):
+  inputs = tf.keras.Input(shape=(max_length, d_model), name="inputs")
+  mask = tf.keras.Input(shape=(1, 1, max_length), name="mask")
+
+  attention, _ = MultiHeadAttention(
+      d_model, num_heads)(inputs=[inputs, inputs, inputs, mask])
+  attention = tf.keras.layers.Dropout(rate=dropout)(attention)
+
+  layer_norm_1 = tf.keras.layers.LayerNormalization(
+      epsilon=1e-6)(inputs + attention)
+  outputs = tf.keras.layers.Dense(units=units, activation='relu')(layer_norm_1)
+  outputs = tf.keras.layers.Dense(units=d_model)(outputs)
+  outputs = tf.keras.layers.Dropout(rate=dropout)(outputs)
+  outputs = tf.keras.layers.LayerNormalization(
+      epsilon=1e-6)(layer_norm_1 + outputs)
+
+  encoder_layer = tf.keras.Model(
+      inputs=[inputs, mask], outputs=outputs, name='encoder_layer')
+
+  return encoder_layer
+
+
 class DecoderLayer(tf.keras.layers.Layer):
 
   def __init__(self, d_model, num_heads, dff, dropout=0.1):
@@ -333,6 +361,10 @@ class DecoderLayer(tf.keras.layers.Layer):
     out3 = self.layernorm3(ffn_output + out2)
 
     return out3, attn_weights_block1, attn_weights_block2
+
+
+def get_decoder_layer():
+  pass
 
 
 class Encoder(tf.keras.layers.Layer):
