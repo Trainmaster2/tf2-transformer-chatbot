@@ -1,5 +1,6 @@
 import argparse
 import tensorflow as tf
+import tensorflowjs as tfjs
 
 tf.random.set_seed(1234)
 
@@ -14,6 +15,10 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
 
     self.d_model = tf.cast(hparams.d_model, dtype=tf.float32)
     self.warmup_steps = warmup_steps
+    
+  def get_config(self):
+    return {'d_model':self.d_model,
+            'warmup_steps':self.warmup_steps}
 
   def __call__(self, step):
     arg1 = tf.math.rsqrt(step)
@@ -102,6 +107,8 @@ def main(hparams):
   model.fit(dataset, epochs=hparams.epochs)
 
   evaluate(hparams, model, tokenizer)
+  
+  tfjs.converters.save_keras_model(model, './model/')
 
 
 if __name__ == '__main__':
