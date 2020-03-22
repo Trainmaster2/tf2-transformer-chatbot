@@ -37,6 +37,15 @@ class MultiHeadAttention(tf.keras.layers.Layer):
     self.value_dense = tf.keras.layers.Dense(self.d_model)
 
     self.dense = tf.keras.layers.Dense(self.d_model)
+  
+  def get_config(self):
+    return {'num_heads':self.num_heads,
+            'd_model':self.d_model,
+            'depth':self.depth,
+            'query_dense':self.query_dense,
+            'key_dense':self.key_dense,
+            'value_dense':self.value_dense,
+            'dense':self.dense}
 
   def split_heads(self, inputs, batch_size):
     inputs = tf.reshape(
@@ -91,6 +100,9 @@ class PositionalEncoding(tf.keras.layers.Layer):
     super(PositionalEncoding, self).__init__()
     self.pos_encoding = self.positional_encoding(hparams.vocab_size,
                                                  hparams.d_model)
+                                                 
+  def get_config(self):
+    return {'pos_encoding':self.pos_encoding}
 
   def get_angles(self, position, i, d_model):
     angles = 1 / tf.pow(10000, (2 * (i // 2)) / tf.cast(d_model, tf.float32))
